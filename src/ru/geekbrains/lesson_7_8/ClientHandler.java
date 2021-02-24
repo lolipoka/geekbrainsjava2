@@ -1,4 +1,4 @@
-package ru.geekbrains.lesson7;
+package ru.geekbrains.lesson_7_8;
 
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
@@ -6,12 +6,14 @@ import java.io.IOException;
 import java.net.Socket;
 
 public class ClientHandler {
+    private static final long AUTH_TIMEOUT = 120_000L;
     private final MyServer myServer;
     private final Socket socket;
     private final DataInputStream in;
     private final DataOutputStream out;
-
+    private final long startTime;
     private String name;
+
 
     public String getName() {
         return name;
@@ -24,6 +26,9 @@ public class ClientHandler {
             this.in = new DataInputStream(socket.getInputStream());
             this.out = new DataOutputStream(socket.getOutputStream());
             this.name = "";
+
+            startTime = System.currentTimeMillis();
+
             new Thread(this::run).start();
         } catch (IOException e) {
             throw new RuntimeException("Проблемы при создании обработчика клиента");
@@ -46,7 +51,13 @@ public class ClientHandler {
             String str = in.readUTF();
             if (str.startsWith("/auth")) {
                 String[] parts = str.split("\\s");
-                String nick = myServer.getAuthService().getNickByLoginPass(parts[1], parts[2]);
+                if (parts.length != 3) {
+                    sendMsg("Неверные логин/пароль");
+                    continue;
+                }
+                String login = parts[1];
+                String password = parts[2];
+                String nick = myServer.getAuthService().getNickByLoginPass(login, password);
                 if (nick != null) {
                     if (!myServer.isNickBusy(nick)) {
                         sendMsg("/authok " + nick);
@@ -66,27 +77,20 @@ public class ClientHandler {
 
     public void readMessages() throws IOException {
         while (true) {
-            String strFromClient = in.readUTF();
-
-            if (strFromClient.startsWith("/w")) {
-                String[] parts = strFromClient.split("\\s");
-
-                String nick = parts[1];
-                int msgStartIndex = 4 + nick.length();
-                String msg = strFromClient.substring(msgStartIndex);
-
-                myServer.sendMsg(nick, String.format("от %s (приватное): %s", name, msg));
+            String str = in.readUTF();
+            if (str.startsWith("/")) {
+                if (str.equals("/end")) {
+                    break;
+                }
+                if (str.startsWith("/w ")) {
+                    String[] tokens = str.split("\\s");
+                    String nick = tokens[1];
+                    String msg = str.substring(4 + nick.length());
+                    myServer.sendMsgToClient(this, nick, msg);
+                }
                 continue;
             }
-
-            if (strFromClient.equals("/end")) {
-                String clientExitMsg = String.format("%s вышел из чата", name);
-                System.out.println(clientExitMsg);
-                return;
-            } else {
-                System.out.printf("от %s: %s\n", name, strFromClient);
-            }
-            myServer.broadcastMsg(String.format("%s: %s", name, strFromClient));
+            myServer.broadcastMsg(name + ": " + str);
         }
     }
 
