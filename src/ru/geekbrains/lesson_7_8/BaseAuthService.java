@@ -1,4 +1,4 @@
-package ru.geekbrains.lesson7;
+package ru.geekbrains.lesson_7_8;
 
 import java.util.ArrayList;
 import java.util.List;

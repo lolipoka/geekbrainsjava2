@@ -1,4 +1,4 @@
-package ru.geekbrains.lesson7;
+package ru.geekbrains.lesson_7_8;
 
 public class ServerApp {
     public static void main(String[] args) {
